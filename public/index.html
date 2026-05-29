@@ -485,22 +485,35 @@ async function handleAppMessage(event) {
       log(`mcp error: ${err.message}`, 'err');
     }
 
-    // Tavus docs say ~5K tokens is the sweet spot, ~20K chars worth of content.
-    // Sonnet handles up to 200K tokens natively but Tavus has its own pipeline
-    // budget. 16K char cap stays well inside the safe zone while giving the model
-    // enough grounded material to actually compose an answer from.
+    // Tavus docs are explicit: append_llm_context is SILENT and only informs
+    // future responses — it does not trigger a response to the current turn.
+    // For tool results that should generate a spoken response, conversation.respond
+    // is the correct event: text is treated as if the user said it, the LLM
+    // hears it and generates a natural response.
+    // Ref: docs.tavus.io/sections/onboarding-guide/tool-calling-examples
+
+    // Sonnet handles 200K tokens but Tavus's own pipeline has a context budget.
+    // 16K chars (~4K tokens) stays inside the safe zone the docs describe.
     if (resultText.length > 16000) {
       resultText = resultText.slice(0, 16000) + "\n…[truncated for context window]";
     }
+
+    // Phrase the result as if the user is reporting back what the tool returned.
+    // The LLM hears this as user input and generates a spoken response to it.
+    const userFraming =
+      `Here is the result of the ${fnName} tool I just called for you, ` +
+      `with arguments ${JSON.stringify(fnArgs)}. Please use it to answer my question:\n\n` +
+      resultText;
+
     callObject.sendAppMessage({
       message_type: "conversation",
-      event_type: "conversation.append_llm_context",
+      event_type: "conversation.respond",
       conversation_id: data.conversation_id || currentConversationId,
       properties: {
-        context: `[Tool result from ${fnName}(${JSON.stringify(fnArgs)})]:\n${resultText}\n[End of tool result. Use this result to answer the user's question.]`,
+        text: userFraming,
       },
     }, '*');
-    log(`← context appended (${resultText.length} chars)`, 'ok');
+    log(`← respond sent (${resultText.length} chars, user-framed)`, 'ok');
   }
 }
 
