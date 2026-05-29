@@ -502,7 +502,7 @@ async function handleAppMessage(event) {
 
 // ── Mint + join ────────────────────────────────────────────────────────
 async function startConversation(personaKey) {
-  showOverlay("Spinning up the conversation…", "First minute or so");
+  showOverlay("Spinning up the room…", "A few seconds");
 
   let mintResp;
   try {
@@ -557,9 +557,25 @@ async function startConversation(personaKey) {
     showFullscreenButton: false,
   });
   callObject.on('app-message', handleAppMessage);
-  callObject.on('joined-meeting', () => { log('joined meeting', 'ok'); hideOverlay(); });
-  callObject.on('left-meeting', () => log('left meeting'));
-  callObject.on('error', (e) => log(`call error: ${e.errorMsg || JSON.stringify(e)}`, 'err'));
+  // Hide overlay as soon as Tavus' prejoin UI loads — at that point the user
+  // needs to click through it, so the overlay must be out of the way.
+  // joined-meeting fires only after the user has clicked Continue, so it's
+  // the wrong trigger for hiding the overlay.
+  callObject.on('loading',         () => log('room loading…'));
+  callObject.on('loaded',          () => { log('room ready', 'ok'); hideOverlay(); });
+  callObject.on('joined-meeting',  () => log('joined meeting', 'ok'));
+  callObject.on('left-meeting',    () => log('left meeting'));
+  callObject.on('error',           (e) => log(`call error: ${e.errorMsg || JSON.stringify(e)}`, 'err'));
+
+  // Safety net: if neither 'loaded' nor 'joined-meeting' fires in 8 seconds,
+  // hide the overlay anyway so the user isn't stuck behind it forever.
+  setTimeout(() => {
+    if ($overlay.style.display !== 'none') {
+      log('overlay safety-timeout fired', 'info');
+      hideOverlay();
+    }
+  }, 8000);
+
   try {
     await callObject.join({ url: mintResp.conversation_url });
   } catch (err) {
