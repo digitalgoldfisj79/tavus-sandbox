@@ -1,0 +1,625 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Conversational AI sandbox</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink:   #1a1612;
+    --paper: #f4eee1;
+    --rust:  #9c4a2a;
+    --moss:  #3d5a3a;
+    --bronze:#8a6f3d;
+    --line:  rgba(26,22,18,0.18);
+    --muted: #6b6155;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "Fraunces", Georgia, serif;
+    min-height: 100vh;
+    background-image:
+      radial-gradient(circle at 15% 10%, rgba(156,74,42,0.06), transparent 50%),
+      radial-gradient(circle at 90% 90%, rgba(61,90,58,0.05), transparent 50%);
+  }
+  header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding: 24px 40px 16px;
+    border-bottom: 1px solid var(--line);
+  }
+  .brand { font-family: "Fraunces", serif; font-weight: 400; font-style: italic; font-size: 22px; }
+  .brand b { font-style: normal; font-weight: 500; color: var(--rust); }
+  .meta { font-family: "JetBrains Mono", monospace; font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.18em; }
+
+  /* ───────────────────────  PICKER VIEW  ─────────────────────── */
+  #picker { padding: 64px 40px; max-width: 920px; margin: 0 auto; }
+  #picker h1 {
+    font-family: "Fraunces", serif;
+    font-weight: 300;
+    font-size: clamp(36px, 5vw, 52px);
+    line-height: 1.05;
+    margin: 0 0 16px;
+    letter-spacing: -0.015em;
+  }
+  #picker h1 em { font-style: italic; color: var(--rust); }
+  #picker .lede {
+    font-size: 18px;
+    line-height: 1.6;
+    color: #2b2520;
+    max-width: 56ch;
+    margin: 0 0 48px;
+  }
+  .cards { display: grid; gap: 16px; }
+  .card {
+    background: rgba(255,255,255,0.55);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 24px 26px;
+    cursor: pointer;
+    transition: all 200ms;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 20px;
+    align-items: center;
+  }
+  .card:hover {
+    background: rgba(255,255,255,0.85);
+    border-color: rgba(156,74,42,0.4);
+    transform: translateY(-1px);
+  }
+  .card.disabled { opacity: 0.5; pointer-events: none; }
+  .card .title {
+    font-family: "Fraunces", serif;
+    font-size: 21px;
+    font-weight: 500;
+    margin-bottom: 6px;
+  }
+  .card .blurb {
+    font-size: 14.5px;
+    line-height: 1.5;
+    color: var(--muted);
+    max-width: 56ch;
+  }
+  .card .tag {
+    display: inline-block;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 9.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--moss);
+    margin-top: 8px;
+  }
+  .card .arrow {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 24px;
+    color: var(--rust);
+  }
+  #picker .footnote {
+    margin-top: 40px;
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.6;
+    border-top: 1px solid var(--line);
+    padding-top: 24px;
+    max-width: 56ch;
+  }
+
+  /* ───────────────────────  CONVERSATION VIEW  ─────────────────────── */
+  #conversation { display: none; }
+  #conversation.active { display: block; }
+  #conversation .topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 40px;
+    border-bottom: 1px solid var(--line);
+    background: rgba(255,255,255,0.4);
+  }
+  #conversation .conv-title { font-family: "Fraunces", serif; font-size: 18px; font-style: italic; }
+  #conversation .conv-id { font-family: "JetBrains Mono", monospace; font-size: 10px; color: var(--muted); margin-left: 12px; }
+  .endbtn {
+    background: var(--ink);
+    color: var(--paper);
+    border: 0;
+    padding: 9px 18px;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: background 200ms;
+  }
+  .endbtn:hover { background: var(--rust); }
+
+  main {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: 28px;
+    padding: 28px 40px;
+    max-width: 1400px;
+    margin: 0 auto;
+    align-items: start;
+  }
+  main.single { grid-template-columns: 1fr; max-width: 900px; }
+  #stage {
+    background: var(--ink);
+    border-radius: 4px;
+    aspect-ratio: 4/3;
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0 30px 60px -20px rgba(26,22,18,0.4);
+  }
+  #stage iframe { width: 100% !important; height: 100% !important; border: 0 !important; }
+
+  .panel {
+    background: rgba(255,255,255,0.45);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 18px 20px;
+    margin-bottom: 16px;
+  }
+  .panel h2 {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: var(--muted);
+    margin: 0 0 12px;
+    font-weight: 500;
+  }
+  .tools-list { list-style: none; padding: 0; margin: 0; font-family: "JetBrains Mono", monospace; font-size: 11px; }
+  .tools-list li { padding: 3px 0; color: var(--muted); transition: color 200ms; }
+  .tools-list li.firing { color: var(--rust); font-weight: 500; }
+  .log {
+    background: var(--ink);
+    color: rgba(244,238,225,0.85);
+    font-family: "JetBrains Mono", monospace;
+    font-size: 10.5px;
+    line-height: 1.55;
+    padding: 12px 14px;
+    border-radius: 3px;
+    max-height: 320px;
+    overflow-y: auto;
+  }
+  .log .ts  { color: rgba(244,238,225,0.4); }
+  .log .ok  { color: #9bd486; }
+  .log .err { color: #e29c9c; }
+  .log .tool{ color: #f0c878; }
+  .log .recv{ color: #88b8d4; }
+  .log .info{ color: rgba(244,238,225,0.6); }
+
+  /* loading + error overlays */
+  .overlay {
+    position: fixed; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(244, 238, 225, 0.92);
+    z-index: 100;
+  }
+  .overlay-box { text-align: center; max-width: 360px; padding: 32px; }
+  .overlay-box .ring {
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--rust);
+    box-shadow: 0 0 0 6px rgba(156,74,42,0.15), 0 0 0 12px rgba(156,74,42,0.07);
+    margin: 0 auto 20px;
+    animation: pulse 2.4s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%,100% { opacity: 0.6; transform: scale(0.95); }
+    50%     { opacity: 1;   transform: scale(1.05); }
+  }
+  .overlay-box p {
+    font-family: "Fraunces", serif;
+    font-weight: 300;
+    font-style: italic;
+    font-size: 19px;
+    margin: 0 0 8px;
+  }
+  .overlay-box small {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.18em;
+    color: var(--muted);
+  }
+  .overlay-box .err-detail {
+    margin-top: 16px;
+    background: rgba(139, 46, 46, 0.08);
+    border: 1px solid rgba(139, 46, 46, 0.3);
+    padding: 10px 12px;
+    border-radius: 3px;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 11px;
+    color: #8b2e2e;
+    text-align: left;
+  }
+  .overlay-box button {
+    margin-top: 20px;
+    background: var(--ink);
+    color: var(--paper);
+    border: 0;
+    padding: 10px 22px;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    border-radius: 3px;
+    cursor: pointer;
+  }
+
+  footer {
+    padding: 18px 40px 24px;
+    border-top: 1px solid var(--line);
+    font-family: "JetBrains Mono", monospace;
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    text-align: center;
+  }
+  @media (max-width: 900px) {
+    main { grid-template-columns: 1fr; padding: 20px; }
+    header, #picker, footer, #conversation .topbar { padding-left: 20px; padding-right: 20px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">Conversational <b>sandbox</b></div>
+  <div class="meta">Personal · ephemeral · ed</div>
+</header>
+
+<!-- ────────────────────  PICKER  ──────────────────── -->
+<section id="picker">
+  <h1>Pick a <em>conversation</em>.</h1>
+  <p class="lede">
+    Each option spins up a fresh Tavus conversation server-side and joins you to it.
+    Conversations are ephemeral — they exist only while you're talking. Closing the
+    tab or clicking <em>End</em> tears the room down cleanly.
+  </p>
+
+  <div class="cards" id="cards">
+    <!-- populated from /api/personas -->
+    <div class="card disabled">
+      <div>
+        <div class="title">Loading personas…</div>
+        <div class="blurb">If this hangs, check the browser console.</div>
+      </div>
+    </div>
+  </div>
+
+  <p class="footnote">
+    Server hides the Tavus API key. Each click costs roughly 1 conversational minute
+    minimum (room creation) plus actual conversation time. Be intentional.
+  </p>
+</section>
+
+<!-- ────────────────────  CONVERSATION  ──────────────────── -->
+<section id="conversation">
+  <div class="topbar">
+    <div>
+      <span class="conv-title" id="conv-title">—</span>
+      <span class="conv-id" id="conv-id">—</span>
+    </div>
+    <button class="endbtn" id="endbtn">End conversation</button>
+  </div>
+  <main id="conv-main">
+    <div id="stage"></div>
+    <div id="rhs" style="display:none">
+      <div class="panel">
+        <h2>Tools available</h2>
+        <ul class="tools-list" id="tools-list"></ul>
+      </div>
+      <div class="panel">
+        <h2>Bridge log</h2>
+        <div class="log" id="log"></div>
+      </div>
+    </div>
+  </main>
+</section>
+
+<footer>Sandbox · personal use · keys never reach the browser</footer>
+
+<!-- loading / error overlay -->
+<div class="overlay" id="overlay" style="display:none">
+  <div class="overlay-box">
+    <div class="ring" id="overlay-ring"></div>
+    <p id="overlay-msg">Spinning up the conversation…</p>
+    <small id="overlay-sub">First minute or so</small>
+    <div class="err-detail" id="overlay-err" style="display:none"></div>
+    <button id="overlay-retry" style="display:none" onclick="location.reload()">Back to start</button>
+  </div>
+</div>
+
+<script crossorigin src="https://unpkg.com/@daily-co/daily-js"></script>
+<script>
+"use strict";
+
+// ── DOM refs ───────────────────────────────────────────────────────────
+const $picker = document.getElementById('picker');
+const $conversation = document.getElementById('conversation');
+const $cards = document.getElementById('cards');
+const $overlay = document.getElementById('overlay');
+const $overlayRing = document.getElementById('overlay-ring');
+const $overlayMsg = document.getElementById('overlay-msg');
+const $overlaySub = document.getElementById('overlay-sub');
+const $overlayErr = document.getElementById('overlay-err');
+const $overlayRetry = document.getElementById('overlay-retry');
+const $stage = document.getElementById('stage');
+const $rhs = document.getElementById('rhs');
+const $main = document.getElementById('conv-main');
+const $convTitle = document.getElementById('conv-title');
+const $convId = document.getElementById('conv-id');
+const $endbtn = document.getElementById('endbtn');
+const $log = document.getElementById('log');
+const $tools = document.getElementById('tools-list');
+
+// ── UI helpers ─────────────────────────────────────────────────────────
+function showOverlay(msg, sub) {
+  $overlayMsg.textContent = msg;
+  $overlaySub.textContent = sub || "";
+  $overlayErr.style.display = 'none';
+  $overlayRetry.style.display = 'none';
+  $overlayRing.style.display = '';
+  $overlay.style.display = '';
+}
+function showError(detail) {
+  $overlayMsg.textContent = "Something went wrong.";
+  $overlaySub.textContent = "";
+  $overlayErr.textContent = detail;
+  $overlayErr.style.display = '';
+  $overlayRetry.style.display = '';
+  $overlayRing.style.display = 'none';
+  $overlay.style.display = '';
+}
+function hideOverlay() { $overlay.style.display = 'none'; }
+
+function log(msg, cls='info') {
+  if (!$log) return;
+  const time = new Date().toLocaleTimeString('en-GB', {hour12:false});
+  const line = document.createElement('div');
+  line.innerHTML = `<span class="ts">${time}</span> <span class="${cls}">${msg}</span>`;
+  $log.appendChild(line);
+  $log.scrollTop = $log.scrollHeight;
+}
+
+// ── MCP bridge state ───────────────────────────────────────────────────
+let mcpEndpoint = null;
+let mcpSessionId = null;
+let mcpRequestId = 0;
+
+async function mcpRequest(method, params) {
+  mcpRequestId += 1;
+  const body = { jsonrpc: "2.0", id: mcpRequestId, method };
+  if (params !== undefined) body.params = params;
+  const headers = {
+    "Content-Type": "application/json",
+    "Accept": "application/json, text/event-stream",
+  };
+  if (mcpSessionId) headers["mcp-session-id"] = mcpSessionId;
+  const resp = await fetch(mcpEndpoint, { method: "POST", headers, body: JSON.stringify(body) });
+  const sid = resp.headers.get("mcp-session-id");
+  if (sid && !mcpSessionId) { mcpSessionId = sid; log(`mcp session ${sid.slice(0,8)}…`, 'ok'); }
+  const text = await resp.text();
+  let payload = text;
+  if (text.startsWith("event:")) {
+    const dataLine = text.split("\n").find(l => l.startsWith("data:"));
+    if (dataLine) payload = dataLine.slice(5).trim();
+  }
+  return JSON.parse(payload);
+}
+async function ensureMcpInit() {
+  if (mcpSessionId) return;
+  log("initialising mcp…");
+  const init = await mcpRequest("initialize", {
+    protocolVersion: "2024-11-05",
+    capabilities: {},
+    clientInfo: { name: "tavus-sandbox", version: "0.1" },
+  });
+  if (init.error) {
+    log(`mcp init failed: ${JSON.stringify(init.error)}`, 'err');
+    throw new Error("mcp init failed");
+  }
+}
+async function callMcpTool(name, args) {
+  await ensureMcpInit();
+  const r = await mcpRequest("tools/call", { name, arguments: args || {} });
+  if (r.error) throw new Error(`${r.error.code}: ${r.error.message}`);
+  const content = r.result?.content || [];
+  return content.filter(c => c.type === "text").map(c => c.text).join("\n");
+}
+async function listMcpTools() {
+  await ensureMcpInit();
+  const r = await mcpRequest("tools/list");
+  return (r.result?.tools || []).map(t => t.name);
+}
+function flashTool(name) {
+  const el = document.getElementById(`t-${name}`);
+  if (!el) return;
+  el.classList.add('firing');
+  setTimeout(() => el.classList.remove('firing'), 3000);
+}
+
+// ── Daily / Tavus integration ──────────────────────────────────────────
+let callObject = null;
+let currentConversationId = null;
+
+async function handleAppMessage(event) {
+  const data = event?.data;
+  if (!data) return;
+
+  if (data.event_type && data.event_type !== "conversation.utterance" && data.event_type !== "conversation.replica_started_speaking" && data.event_type !== "conversation.replica_stopped_speaking") {
+    // log structural events but skip the noisy ones
+    if (data.event_type !== "conversation.user_started_speaking" && data.event_type !== "conversation.user_stopped_speaking") {
+      log(`[event] ${data.event_type}`, 'info');
+    }
+  }
+
+  if (data.message_type === "conversation" && data.event_type === "conversation.tool_call") {
+    const props = data.properties || {};
+    const fnName = props.name;
+    let fnArgs = props.arguments || "{}";
+    if (typeof fnArgs === "string") {
+      try { fnArgs = JSON.parse(fnArgs); } catch { fnArgs = {}; }
+    }
+    log(`tool call: <span class="tool">${fnName}</span> ${JSON.stringify(fnArgs)}`);
+    flashTool(fnName);
+
+    let resultText;
+    try {
+      resultText = await callMcpTool(fnName, fnArgs);
+      const preview = resultText.replace(/\s+/g,' ').slice(0,140);
+      log(`→ ${preview}${resultText.length > 140 ? '…' : ''}`, 'recv');
+    } catch (err) {
+      resultText = `[bridge error] ${err.message}`;
+      log(`mcp error: ${err.message}`, 'err');
+    }
+
+    if (resultText.length > 4000) {
+      resultText = resultText.slice(0, 4000) + "\n…[truncated for context window]";
+    }
+    callObject.sendAppMessage({
+      message_type: "conversation",
+      event_type: "conversation.append_llm_context",
+      conversation_id: data.conversation_id || currentConversationId,
+      properties: {
+        context: `[Tool result from ${fnName}(${JSON.stringify(fnArgs)})]:\n${resultText}\n[End of tool result. Use this result to answer the user's question.]`,
+      },
+    }, '*');
+    log(`← context appended (${resultText.length} chars)`, 'ok');
+  }
+}
+
+// ── Mint + join ────────────────────────────────────────────────────────
+async function startConversation(personaKey) {
+  showOverlay("Spinning up the conversation…", "First minute or so");
+
+  let mintResp;
+  try {
+    const r = await fetch("/api/mint", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ personaKey, userLabel: "ed" }),
+    });
+    mintResp = await r.json();
+    if (!r.ok) {
+      const code = mintResp.error || `http_${r.status}`;
+      const detail = typeof mintResp.detail === 'string' ? mintResp.detail : JSON.stringify(mintResp.detail || {});
+      showError(`${code}\n\n${detail}`);
+      return;
+    }
+  } catch (err) {
+    showError(`Network error: ${err.message}`);
+    return;
+  }
+
+  currentConversationId = mintResp.conversation_id;
+  $convTitle.textContent = mintResp.persona.title;
+  $convId.textContent = `${mintResp.conversation_id.slice(0,12)}…`;
+
+  // Show conversation view
+  $picker.style.display = 'none';
+  $conversation.classList.add('active');
+
+  // Wire MCP if needed
+  if (mintResp.persona.needs_mcp_bridge) {
+    mcpEndpoint = mintResp.persona.mcp_endpoint;
+    $rhs.style.display = '';
+    $main.classList.remove('single');
+    $tools.innerHTML = '<li>discovering tools…</li>';
+    try {
+      const names = await listMcpTools();
+      $tools.innerHTML = names.map(n => `<li id="t-${n}">${n}</li>`).join('');
+      log(`mcp ready — ${names.length} tools`, 'ok');
+    } catch (err) {
+      log(`mcp discovery failed: ${err.message}`, 'err');
+      $tools.innerHTML = `<li style="color: #8b2e2e">discovery failed: ${err.message}</li>`;
+    }
+  } else {
+    $rhs.style.display = 'none';
+    $main.classList.add('single');
+  }
+
+  // Join the room
+  callObject = window.DailyIframe.createFrame($stage, {
+    iframeStyle: { width: "100%", height: "100%", border: "0" },
+    showLeaveButton: false,
+    showFullscreenButton: false,
+  });
+  callObject.on('app-message', handleAppMessage);
+  callObject.on('joined-meeting', () => { log('joined meeting', 'ok'); hideOverlay(); });
+  callObject.on('left-meeting', () => log('left meeting'));
+  callObject.on('error', (e) => log(`call error: ${e.errorMsg || JSON.stringify(e)}`, 'err'));
+  try {
+    await callObject.join({ url: mintResp.conversation_url });
+  } catch (err) {
+    showError(`Couldn't join the conversation room: ${err.message || err}`);
+  }
+}
+
+async function endConversation() {
+  if (!currentConversationId) return;
+  $endbtn.disabled = true;
+  $endbtn.textContent = "Ending…";
+  try {
+    if (callObject) { try { await callObject.leave(); } catch {} try { callObject.destroy(); } catch {} }
+    await fetch("/api/end", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ conversation_id: currentConversationId }),
+    });
+  } catch {}
+  location.reload();
+}
+
+// ── Boot ───────────────────────────────────────────────────────────────
+async function init() {
+  // Load persona catalogue
+  try {
+    const r = await fetch("/api/personas");
+    const data = await r.json();
+    if (!data.personas?.length) {
+      $cards.innerHTML = '<div class="card disabled"><div><div class="title">No personas configured</div><div class="blurb">Check lib/personas.js on the server.</div></div></div>';
+      return;
+    }
+    $cards.innerHTML = data.personas.map(p => `
+      <div class="card" data-key="${p.key}">
+        <div>
+          <div class="title">${p.title}</div>
+          <div class="blurb">${p.blurb}</div>
+          ${p.needs_mcp_bridge ? '<span class="tag">+ live MCP tool calls</span>' : ''}
+        </div>
+        <div class="arrow">→</div>
+      </div>
+    `).join('');
+    $cards.querySelectorAll('.card').forEach(card => {
+      card.addEventListener('click', () => startConversation(card.dataset.key));
+    });
+  } catch (err) {
+    $cards.innerHTML = `<div class="card disabled"><div><div class="title">Couldn't load personas</div><div class="blurb">${err.message}</div></div></div>`;
+  }
+}
+
+$endbtn.addEventListener('click', endConversation);
+window.addEventListener('beforeunload', () => {
+  if (currentConversationId && callObject) {
+    // best-effort cleanup; keepalive lets the fetch survive page unload
+    navigator.sendBeacon("/api/end", JSON.stringify({ conversation_id: currentConversationId }));
+  }
+});
+
+init();
+</script>
+
+</body>
+</html>
