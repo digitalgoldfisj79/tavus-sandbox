@@ -485,8 +485,12 @@ async function handleAppMessage(event) {
       log(`mcp error: ${err.message}`, 'err');
     }
 
-    if (resultText.length > 4000) {
-      resultText = resultText.slice(0, 4000) + "\n…[truncated for context window]";
+    // Tavus docs say ~5K tokens is the sweet spot, ~20K chars worth of content.
+    // Sonnet handles up to 200K tokens natively but Tavus has its own pipeline
+    // budget. 16K char cap stays well inside the safe zone while giving the model
+    // enough grounded material to actually compose an answer from.
+    if (resultText.length > 16000) {
+      resultText = resultText.slice(0, 16000) + "\n…[truncated for context window]";
     }
     callObject.sendAppMessage({
       message_type: "conversation",
