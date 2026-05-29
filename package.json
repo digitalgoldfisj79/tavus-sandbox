@@ -1,0 +1,11 @@
+{
+  "name": "tavus-mint-server",
+  "version": "0.1.0",
+  "description": "Mint-on-click Tavus conversations with persona/replica catalogue, MCP bridge for Voynich",
+  "private": true,
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "dev": "vercel dev",
+    "deploy": "vercel deploy --prod"
+  }
+}
